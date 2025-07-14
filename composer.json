@@ -1,0 +1,27 @@
+{
+  "name": "webatvantage/php-cs-fixer-config",
+  "description": "Provides a GitHub repository template for a configuration factory and rule set factories for friendsofphp/php-cs-fixer.",
+  "license": "proprietary",
+  "type": "library",
+  "authors": [
+    {
+      "name": "Tom Six",
+      "email": "tom@webatvantage.be"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Webatvantage\\PhpCsFixer\\Config\\": "src"
+    }
+  },
+  "require": {
+    "php": "^7.4 || ^8.2",
+    "friendsofphp/php-cs-fixer": "~3.82.0"
+  },
+  "scripts": {
+    "format": "vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.php"
+  },
+  "config": {
+    "sort-packages": true
+  }
+}
