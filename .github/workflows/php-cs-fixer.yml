@@ -1,0 +1,38 @@
+name: Format PHP Code
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  format-code:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Load PHP CS Fixer Cache
+        uses: actions/cache@v4
+        with:
+            path: .php-cs-fixer.cache
+            key: ${{ runner.OS }}-${{ github.repository }}-phpcsfixer-${{ github.sha }}
+            restore-keys: |
+              ${{ runner.OS }}-${{ github.repository }}-phpcsfixer-
+
+      - name: Run PHP CS Fixer
+        uses: docker://oskarstark/php-cs-fixer-ga
+        with:
+          args: --config=.php-cs-fixer.php
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: Fix styling

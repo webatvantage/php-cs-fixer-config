@@ -1,21 +1,6 @@
 # Webatvantage PHP Code Style Config
 
-
 ## Installation
-
-Composer config
-
-```json
-{
-  "repositories": [
-    {
-      "name": "webatvantage/php-cs-fixer-config",
-      "type": "vcs",
-      "url": "https://github.com/webatvantage/php-cs-fixer-config"
-    }
-  ]
-}
-```
 
 Run
 
