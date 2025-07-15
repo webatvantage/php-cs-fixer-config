@@ -3,6 +3,20 @@
 
 ## Installation
 
+Composer config
+
+```json
+{
+  "repositories": [
+    {
+      "name": "webatvantage/php-cs-fixer-config",
+      "type": "vcs",
+      "url": "https://github.com/webatvantage/php-cs-fixer-config"
+    }
+  ]
+}
+```
+
 Run
 
 ```sh
@@ -11,9 +25,10 @@ composer require --dev webatvantage/php-cs-fixer-config
 
 ## Usage
 
-Config
+Config: `.php-cs-fixer.php`
 
 ```php
+<?php
 
 declare(strict_types=1);
 
@@ -31,4 +46,16 @@ $finder = PhpCsFixer\Finder::create()
 return Config::default()
 	->setFinder($finder);
 
+```
+
+## Additional
+
+Composer format script
+
+```json
+{
+  "scripts": {
+    "format": "vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.php"
+  }
+}
 ```
