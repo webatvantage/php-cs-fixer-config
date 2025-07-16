@@ -16,7 +16,7 @@
   },
   "require": {
     "php": "^7.4 || ^8.2",
-    "friendsofphp/php-cs-fixer": "~3.82.0"
+    "friendsofphp/php-cs-fixer": "^3.84"
   },
   "scripts": {
     "format": "vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.php"
