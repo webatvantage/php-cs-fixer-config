@@ -32,6 +32,7 @@ final class Webatvantage
 					 'position' => 'next_line',
 				 ],
 				 'braces_position' => [ // Braces must be placed as configured.
+					 'functions_opening_brace' => 'next_line_unless_newline_at_signature_end', // The position of the opening brace of functions‘ body.
 					 'control_structures_opening_brace' => 'next_line_unless_newline_at_signature_end', // The position of the opening brace of control structures‘ body.
 				 ],
 				 'blank_line_before_statement' => [ // An empty line feed must precede any configured statement.
