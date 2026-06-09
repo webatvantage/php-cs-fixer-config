@@ -2,6 +2,7 @@
 
 namespace Webatvantage\PhpCsFixer\Config\RuleSet;
 
+use Webatvantage\PhpCsFixer\Config\Fixer\PropertyHookBracesFixer;
 use Webatvantage\PhpCsFixer\Config\RuleSet;
 
 final class Webatvantage
@@ -77,7 +78,11 @@ final class Webatvantage
 						 'property',
 					 ],
 				 ],
+				 'Webatvantage/property_hook_braces' => true, // Keep PHP 8.4 property hook braces on the signature line — works around braces_position mangling them (PHP-CS-Fixer #9657).
 			 ],
+			[
+				new PropertyHookBracesFixer(),
+			],
 		);
 	}
 }

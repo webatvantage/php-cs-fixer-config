@@ -1,0 +1,38 @@
+name: run-tests
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.php'
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: true
+      matrix:
+        php: ['7.4','8.4','8.5']
+        stability: [prefer-stable]
+
+    name: P${{ matrix.php }} - ${{ matrix.stability }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+
+      - name: Install composer dependencies
+        uses: ramsey/composer-install@v4
+
+      - name: Copy environment file
+        run: cp .env.example .env
+
+      - name: Execute tests
+        run: composer test

@@ -44,3 +44,12 @@ Composer format script
   }
 }
 ```
+
+## Development
+
+Custom fixers under `src/Fixer/` are covered by PHPUnit tests.
+
+```sh
+composer install
+composer test
+```
