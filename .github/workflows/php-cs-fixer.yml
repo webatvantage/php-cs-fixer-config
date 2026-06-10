@@ -1,10 +1,11 @@
 name: Format PHP Code
 
 on:
-  pull_request:
   push:
-    branches:
-      - main
+    branches: [ main ]
+    paths:
+      - '**.php'
+  workflow_call:
 
 jobs:
   format-code:
