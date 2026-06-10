@@ -24,9 +24,12 @@ Follow these steps in order. If any preflight check fails, stop and report — d
 
 ```bash
 gh auth status
+git fetch --tags
 git status --porcelain
 git rev-parse --abbrev-ref HEAD
 ```
+
+`git fetch --tags` is required — local tag list may be empty even when releases exist on the remote.
 
 - If `gh auth status` reports not authenticated: stop and tell the user to run `gh auth login`.
 - If `git status --porcelain` is non-empty: stop. Releasing with a dirty tree silently bakes uncommitted changes into the world. Tell the user to commit or stash first.
@@ -56,13 +59,19 @@ git tag --sort=-version:refname | head -1
 ### 4. Collect commits
 
 ```bash
-git log --no-merges --pretty=format:"%s" <since-ref>..HEAD
+git log --no-merges --pretty=format:"%H %s" <since-ref>..HEAD
+git remote get-url origin    # to build commit & compare URLs
 ```
+
+Capture each commit as a `(sha, subject)` pair — the full SHA is needed for the links.
 
 Drop these lines:
 
 - Exact match `Fix styling` — the CI auto-format commit from `.github/workflows/php-cs-fixer.yml`'s `stefanzweifel/git-auto-commit-action` step.
 - Empty lines.
+- Anything the user later asks you to drop during "Edit notes".
+
+Derive the repo's `https://github.com/<owner>/<repo>` URL by stripping `.git` from the origin URL (and normalising `git@github.com:owner/repo` SSH form to HTTPS).
 
 ### 5. Group commits
 
@@ -72,22 +81,25 @@ Drop these lines:
 
 ### 6. Render preview
 
-Output as plain text in the chat — not a tool call, just text the user can read. Format:
+Output as plain text in the chat — not a tool call, just text the user can read. Each bullet is a markdown link from the commit subject to `https://github.com/<owner>/<repo>/commit/<full-sha>`. End with a **Full Changelog** footer linking to the `compare/<since-ref>...<version>` URL.
 
 ```
 Title:  <version>
 Tag:    <version>
-Target: HEAD (<short-sha>)
+Target: main (<short-sha>)
+Since:  <since-ref>
 
 ## Updates
-- <commit subject>
-- <commit subject>
+- [<commit subject>](https://github.com/<owner>/<repo>/commit/<full-sha>)
+- [<commit subject>](https://github.com/<owner>/<repo>/commit/<full-sha>)
 
 ## Fixes
-- <commit subject>
+- [<commit subject>](https://github.com/<owner>/<repo>/commit/<full-sha>)
+
+**Full Changelog**: https://github.com/<owner>/<repo>/compare/<since-ref>...<version>
 ```
 
-Skip the `## Updates` or `## Fixes` header entirely if its list is empty. If both sections are empty, stop and tell the user there's nothing to release since `<since-ref>`.
+Skip the `## Updates` or `## Fixes` header entirely if its list is empty. If both sections are empty, stop and tell the user there's nothing to release since `<since-ref>`. The Full Changelog footer is always included as long as there is at least one section.
 
 ### 7. Confirm
 
@@ -103,7 +115,7 @@ Use `AskUserQuestion` with these options:
 gh release create <version> \
     --title "<version>" \
     --notes "<body>" \
-    --target HEAD
+    --target main
 ```
 
 `gh` creates the tag and pushes it as part of release creation, so no separate `git tag` / `git push --tags` is needed.
@@ -111,7 +123,7 @@ gh release create <version> \
 Pass the body via a heredoc to avoid quoting issues:
 
 ```bash
-gh release create <version> --title "<version>" --target HEAD --notes "$(cat <<'EOF'
+gh release create <version> --title "<version>" --target main --notes "$(cat <<'EOF'
 ## Updates
 - ...
 
@@ -131,28 +143,19 @@ Print the URL so the user can open the release in the browser.
 
 ## Example output
 
-For a first release at `1.0.0` cut from the current `main` (where commits include `Add PropertyHookBracesFixer`, `Expand PHP version matrix in php-cs-fixer workflow`, and `Fix wrong php cs fixer version number`):
+Cutting `1.1.0` on top of `1.0.2` with two non-fix commits in between:
 
 ```
-Title:  1.0.0
-Tag:    1.0.0
-Target: HEAD (fd076c4)
-First release — since-ref is the initial commit.
+Title:  1.1.0
+Tag:    1.1.0
+Target: main (280d388)
+Since:  1.0.2
 
 ## Updates
-- Add PropertyHookBracesFixer
-- Expand PHP version matrix in php-cs-fixer workflow
-- Add function opening brace position
-- Update composer lock file
-- Update workflow: remove windows
-- Update workflow
-- Update workflow
-- Add format workflow
-- Update readme
-- Initial commit
+- [Expand PHP version matrix in php-cs-fixer workflow](https://github.com/webatvantage/php-cs-fixer-config/commit/fd076c49f0d87354498cbc8cc979e2a4ef34b142)
+- [Add PropertyHookBracesFixer](https://github.com/webatvantage/php-cs-fixer-config/commit/4d0e82ab9ed3b9c3ceb82eac0c357990871418d2)
 
-## Fixes
-- Fix wrong php cs fixer version number
+**Full Changelog**: https://github.com/webatvantage/php-cs-fixer-config/compare/1.0.2...1.1.0
 ```
 
 ## Failure modes
