@@ -7,8 +7,25 @@ use Webatvantage\PhpCsFixer\Config\RuleSet;
 
 final class Webatvantage
 {
-	public static function make(): RuleSet
+	/**
+	 * @param int $targetPhpVersion Target PHP version in PHP_VERSION_ID format. Defaults to the runtime version; gates PHP 8.0+ style (e.g. trailing commas in parameter lists).
+	 */
+	public static function make(int $targetPhpVersion = \PHP_VERSION_ID): RuleSet
 	{
+		$trailingCommaElements = [
+			'arguments',
+			'array_destructuring',
+			'arrays',
+			'match',
+		];
+
+		// Trailing commas in parameter lists are PHP 8.0 syntax and fatal on 7.4, so only
+		// enforce them once the project's floor is PHP 8.0 or newer.
+		if ($targetPhpVersion >= 80000)
+		{
+			$trailingCommaElements[] = 'parameters';
+		}
+
 		return RuleSet::make(
 			'webatvantage',
 			[
@@ -17,14 +34,8 @@ final class Webatvantage
 				 'ordered_imports' => ['sort_algorithm' => 'alpha'], // Ordering use statements.
 				 'no_unused_imports' => true, // Unused use statements must be removed.
 				 'not_operator_with_successor_space' => false, // Disable: Logical NOT operators (!) should have one trailing whitespace.
-				 'trailing_comma_in_multiline' => [ // Argument lists, array destructuring lists, arrays that are multi-line, match-lines and the parameter lists must have a trailing comma.
-					 'elements' => [
-						 'arguments',
-						 'array_destructuring',
-						 'arrays',
-						 'match',
-						 'parameters',
-					 ],
+				 'trailing_comma_in_multiline' => [ // Argument lists, array destructuring lists, multi-line arrays and match arms must have a trailing comma.
+					 'elements' => $trailingCommaElements,
 				 ],
 				 'phpdoc_scalar' => true, // Scalar types should always be written in the same form. int not integer, bool not boolean, float not real or double.
 				 'unary_operator_spaces' => true, // Unary operators should be placed adjacent to their operands.
