@@ -9,6 +9,8 @@ use Webatvantage\PhpCsFixer\Config\Fixer\PropertyHookBracesFixer;
 final class PropertyHookBracesFixerTest extends TestCase
 {
 	/**
+	 * @requires PHP >= 8.4
+	 *
 	 * @dataProvider provideFixCases
 	 */
 	public function testFix(string $expected, string $input): void
