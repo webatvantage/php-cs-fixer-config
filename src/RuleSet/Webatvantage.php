@@ -2,6 +2,7 @@
 
 namespace Webatvantage\PhpCsFixer\Config\RuleSet;
 
+use PhpCsFixer\Fixer\LanguageConstruct\SingleSpaceAroundConstructFixer;
 use Webatvantage\PhpCsFixer\Config\Fixer\PropertyHookBracesFixer;
 use Webatvantage\PhpCsFixer\Config\RuleSet;
 
@@ -91,6 +92,9 @@ final class Webatvantage
 				],
 				'explicit_string_variable' => true, // Explicitly declare string variables.
 				'simple_to_complex_string_variable' => true, // Use simple string variables when possible.
+				'single_space_around_construct' => [ // Ensures a single space after language constructs, so a named argument reads `handler: $handler`.
+					'constructs_followed_by_a_single_space' => self::defaultConstructsWithoutClone(),
+				],
 
 				'Webatvantage/property_hook_braces' => true, // Keep PHP 8.4 property hook braces on the signature line — works around braces_position mangling them (PHP-CS-Fixer #9657).
 			],
@@ -98,5 +102,25 @@ final class Webatvantage
 				new PropertyHookBracesFixer(),
 			],
 		);
+	}
+
+	/**
+	 * Every construct the fixer spaces by default, minus clone, whose PHP 8.5 call-style clone-with syntax it would break.
+	 *
+	 * @return array<string>
+	 */
+	private static function defaultConstructsWithoutClone(): array
+	{
+		$options = (new SingleSpaceAroundConstructFixer())->getConfigurationDefinition()->getOptions();
+
+		foreach ($options as $option)
+		{
+			if ($option->getName() === 'constructs_followed_by_a_single_space')
+			{
+				return array_values(array_diff($option->getDefault(), ['clone']));
+			}
+		}
+
+		return [];
 	}
 }

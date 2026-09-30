@@ -71,4 +71,27 @@ final class WebatvantageTest extends TestCase
 			'PHP 8.2' => [80200],
 		];
 	}
+
+	/**
+	 * A named argument written without the space, handler:$handler, is legal PHP and reads as a
+	 * label; the fixer catches it through its named_argument construct.
+	 */
+	public function testNamedArgumentsAreSpaced(): void
+	{
+		$rules = Webatvantage::make()->rules();
+
+		self::assertArrayHasKey('single_space_around_construct', $rules);
+		self::assertContains('named_argument', $rules['single_space_around_construct']['constructs_followed_by_a_single_space']);
+	}
+
+	/**
+	 * PHP 8.5 clone-with is written like a call, clone($object, ['property' => $value]). The fixer
+	 * reads clone as the unary keyword and would push a space in front of that argument list.
+	 */
+	public function testCloneIsLeftAlone(): void
+	{
+		$rules = Webatvantage::make()->rules();
+
+		self::assertNotContains('clone', $rules['single_space_around_construct']['constructs_followed_by_a_single_space']);
+	}
 }
