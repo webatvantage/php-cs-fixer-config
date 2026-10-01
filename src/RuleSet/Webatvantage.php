@@ -79,6 +79,7 @@ final class Webatvantage
 				'concat_space' => [ // Concatenation should be spaced according to configuration.
 					'spacing' => 'one',
 				],
+				'array_indentation' => true, // Each element of an array must be indented exactly once. Required by Webatvantage/chained_call_argument_indentation, which has nothing to re-indent arrays against otherwise.
 				'no_extra_blank_lines' => true, // Removes extra blank lines and/or blank lines following configuration.
 				'multiline_promoted_properties' => [ // Promoted properties must be on separate lines.
 					'minimum_number_of_parameters' => 3, // Minimum number of parameters in the constructor to fix.
