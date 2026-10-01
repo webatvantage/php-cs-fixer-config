@@ -7,6 +7,7 @@ use PhpCsFixer\Fixer\WhitespacesAwareFixerInterface;
 use PhpCsFixer\FixerDefinition\CodeSample;
 use PhpCsFixer\FixerDefinition\FixerDefinition;
 use PhpCsFixer\FixerDefinition\FixerDefinitionInterface;
+use PhpCsFixer\Tokenizer\CT;
 use PhpCsFixer\Tokenizer\Token;
 use PhpCsFixer\Tokenizer\Tokens;
 
@@ -61,7 +62,10 @@ final class ChainedCallArgumentIndentationFixer extends AbstractFixer implements
 				continue;
 			}
 
-			$closeIndex = $tokens->findBlockEnd(Tokens::BLOCK_TYPE_PARENTHESIS, $index);
+			// The deprecated BLOCK_TYPE_PARENTHESIS_BRACE and CT::T_ARRAY_SQUARE_BRACE_CLOSE are used
+			// throughout: their replacements only exist from php-cs-fixer 3.95.5, and this package
+			// supports ^3.84. Both remain available as aliases on current versions.
+			$closeIndex = $tokens->findBlockEnd(Tokens::BLOCK_TYPE_PARENTHESIS_BRACE, $index);
 			$chainIndex = $this->chainOperatorAfter($tokens, $closeIndex);
 
 			if (null === $chainIndex)
@@ -77,6 +81,132 @@ final class ChainedCallArgumentIndentationFixer extends AbstractFixer implements
 			}
 
 			$this->reindent($tokens, $index, $closeIndex, $anchorIndent . $this->whitespacesConfig->getIndent());
+			$this->hugLastArgument($tokens, $closeIndex);
+		}
+	}
+
+	/**
+	 * Pull the closing parenthesis up onto the last argument when that argument is a block closing
+	 * on a line of its own, so the call ends `])` rather than giving the parenthesis its own line.
+	 * The chain then continues from the line the call actually closes on.
+	 *
+	 * An argument list ending in a plain value keeps its trailing comma and its own closing line;
+	 * there is nothing there for the parenthesis to sit against.
+	 */
+	private function hugLastArgument(Tokens $tokens, int $closeIndex): void
+	{
+		$lastIndex = $tokens->getPrevMeaningfulToken($closeIndex);
+
+		if (null === $lastIndex)
+		{
+			return;
+		}
+
+		$commaIndex = null;
+
+		if ($tokens[$lastIndex]->equals(','))
+		{
+			$commaIndex = $lastIndex;
+			$lastIndex = $tokens->getPrevMeaningfulToken($commaIndex);
+		}
+
+		if (null === $lastIndex)
+		{
+			return;
+		}
+
+		// A short array's bracket is a custom token rather than a plain `]`.
+		$closesBlock = $tokens[$lastIndex]->equalsAny([')', '}'])
+			|| $tokens[$lastIndex]->isGivenKind(CT::T_ARRAY_SQUARE_BRACE_CLOSE);
+
+		if (!$closesBlock)
+		{
+			return;
+		}
+
+		// The bracket has to close on its own line. One that trails its own content is already
+		// hugging whatever came before it, and the parenthesis belongs on the next line.
+		$indent = $tokens[$lastIndex - 1]->isWhitespace()
+			? $this->indentAfterLastNewLine($tokens[$lastIndex - 1]->getContent())
+			: null;
+
+		if (null === $indent)
+		{
+			return;
+		}
+
+		for ($index = $closeIndex - 1; $index > $lastIndex; $index--)
+		{
+			$tokens->clearAt($index);
+		}
+
+		if (null !== $commaIndex)
+		{
+			$tokens->clearAt($commaIndex);
+		}
+
+		$this->alignChain($tokens, $closeIndex, $indent);
+	}
+
+	/**
+	 * Put every `->` continuation line of the chain following a call at the same indentation.
+	 * Scanning stops at the first token that cannot be part of the chain, so a line break that
+	 * leads somewhere else leaves the rest of the statement alone.
+	 */
+	private function alignChain(Tokens $tokens, int $closeIndex, string $indent): void
+	{
+		for ($index = $closeIndex + 1, $count = $tokens->count(); $index < $count; $index++)
+		{
+			$token = $tokens[$index];
+
+			if ($token->isWhitespace())
+			{
+				if (null === $this->indentAfterLastNewLine($token->getContent()))
+				{
+					continue;
+				}
+
+				$nextIndex = $tokens->getNextMeaningfulToken($index);
+
+				if (null === $nextIndex || !$tokens[$nextIndex]->isObjectOperator())
+				{
+					return;
+				}
+
+				$this->setIndent($tokens, $index, $indent);
+
+				continue;
+			}
+
+			// Step over a call's arguments or an index in one go; their contents are indented
+			// relative to the chain line they hang off, which this has already settled.
+			if ($token->equals('('))
+			{
+				$index = $tokens->findBlockEnd(Tokens::BLOCK_TYPE_PARENTHESIS_BRACE, $index);
+
+				continue;
+			}
+
+			if ($token->isGivenKind(CT::T_ARRAY_INDEX_CURLY_BRACE_OPEN))
+			{
+				$index = $tokens->findBlockEnd(Tokens::BLOCK_TYPE_ARRAY_INDEX_CURLY_BRACE, $index);
+
+				continue;
+			}
+
+			if ($token->equals('['))
+			{
+				$index = $tokens->findBlockEnd(Tokens::BLOCK_TYPE_INDEX_SQUARE_BRACE, $index);
+
+				continue;
+			}
+
+			// Anything else ends the chain. Bailing out rather than guessing keeps a statement
+			// that merely contains a chain from being re-indented wholesale.
+			if (!$token->isObjectOperator() && !$token->isGivenKind([\T_STRING, \T_VARIABLE]) && !$token->isComment())
+			{
+				return;
+			}
 		}
 	}
 
@@ -217,7 +347,7 @@ final class ChainedCallArgumentIndentationFixer extends AbstractFixer implements
 		// The chain's own indentation is set from the same anchor rather than read off the file.
 		// Nothing upstream normalises a `->` line nested inside an argument list, so trusting what
 		// is there would let each run build on the last one and drift a level deeper every time.
-		$this->setIndent($tokens, $closeIndex + 1, $targetIndent);
+		$this->alignChain($tokens, $closeIndex, $targetIndent);
 
 		if ($currentIndent === $targetIndent)
 		{

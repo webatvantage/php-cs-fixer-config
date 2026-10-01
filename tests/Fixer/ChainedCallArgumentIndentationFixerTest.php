@@ -301,6 +301,72 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 				PHP,
 		];
 
+		yield 'last argument is a block, so the parenthesis hugs it' => [
+			<<<'PHP'
+				<?php
+				return $this->build(
+						[
+							'a' => 1,
+						])
+						->show('#x')
+						->done();
+
+				PHP,
+			<<<'PHP'
+				<?php
+				return $this->build(
+					[
+						'a' => 1,
+					],
+				)
+					->show('#x')
+					->done();
+
+				PHP,
+		];
+
+		yield 'last argument is a plain value, so the parenthesis keeps its line' => [
+			<<<'PHP'
+				<?php
+				return $this->build(
+						1,
+						true,
+					)
+					->show()
+					->done();
+
+				PHP,
+			<<<'PHP'
+				<?php
+				return $this->build(
+					1,
+					true,
+				)
+					->show()
+					->done();
+
+				PHP,
+		];
+
+		yield 'a bracket that is not on its own line is already hugging' => [
+			<<<'PHP'
+				<?php
+				return $this->build(
+						['a'],
+					)
+					->show();
+
+				PHP,
+			<<<'PHP'
+				<?php
+				return $this->build(
+					['a'],
+				)
+					->show();
+
+				PHP,
+		];
+
 		// Named arguments and the nullsafe operator are PHP 8.0 syntax, and Tokens::fromCode()
 		// parses rather than merely lexes, so these cases are a fatal on 7.4 rather than a failure.
 		if (\PHP_VERSION_ID < 80000)
@@ -425,6 +491,7 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 
 		$tokens = Tokens::fromCode($code);
 		$fixer->fix(new \SplFileInfo('dummy.php'), $tokens);
+		$tokens->clearEmptyTokens();
 
 		return $tokens->generateCode();
 	}
