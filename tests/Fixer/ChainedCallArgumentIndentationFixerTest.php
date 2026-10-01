@@ -29,6 +29,125 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 		self::assertSame($expected, self::fix(self::fix($input)));
 	}
 
+	/**
+	 * PHP strips the closing marker's indentation from every line of a heredoc body, so shifting
+	 * a block that holds one is only safe while body and marker move by the same amount. Assert
+	 * on the values themselves, since the indentation is the part that is meant to change.
+	 *
+	 * @dataProvider provideHeredocCases
+	 */
+	public function testHeredocValuesSurviveReindentation(string $code): void
+	{
+		$fixed = self::fix($code);
+
+		self::assertNotSame($code, $fixed, 'fixture is not re-indented, so it proves nothing');
+		self::assertSame(self::heredocValues($code), self::heredocValues($fixed));
+	}
+
+	public static function provideHeredocCases(): iterable
+	{
+		yield 'blank line and a deeper line' => [
+			<<<'PHP'
+				<?php
+				return $this->build(
+					<<<'TXT'
+						line one
+
+						  deeper
+						TXT,
+				)
+					->render();
+
+				PHP,
+		];
+
+		yield 'closing marker at column 0' => [
+			<<<'PHP'
+				<?php
+				return $this->build(
+					<<<'TXT'
+				flush left
+				TXT,
+				)
+					->render();
+
+				PHP,
+		];
+
+		yield 'empty body' => [
+			<<<'PHP'
+				<?php
+				return $this->build(
+					<<<'TXT'
+						TXT,
+				)
+					->render();
+
+				PHP,
+		];
+
+		yield 'blank line before the marker' => [
+			<<<'PHP'
+				<?php
+				return $this->build(
+					<<<'TXT'
+						one
+
+						TXT,
+				)
+					->render();
+
+				PHP,
+		];
+
+		yield 'two heredocs in one argument list' => [
+			<<<'PHP'
+				<?php
+				return $this->build(
+					<<<'A'
+						aaa
+						A,
+					<<<'B'
+						bbb
+						B,
+				)
+					->render();
+
+				PHP,
+		];
+
+		yield 'heredoc inside a nested chain head' => [
+			<<<'PHP'
+				<?php
+				return outer(
+					inner(
+						<<<'TXT'
+							deep
+							TXT,
+					)
+					->mid(),
+				)
+				->tail();
+
+				PHP,
+		];
+
+		yield 'interpolated, variable at the start of a line' => [
+			<<<'PHP'
+				<?php
+				return $this->build(
+					<<<TXT
+				line one
+				$name
+				last
+				TXT,
+				)
+					->render();
+
+				PHP,
+		];
+	}
+
 	public static function provideFixCases(): iterable
 	{
 		yield 'call heading a chain' => [
@@ -159,14 +278,14 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 				PHP,
 		];
 
-		yield 'heredoc body would be corrupted by shifting, so leave the block alone' => [
+		yield 'heredoc body and closing marker move together' => [
 			<<<'PHP'
 				<?php
 				return $this->build(
-					<<<'TXT'
-						line one
-						TXT,
-				)
+						<<<'TXT'
+							line one
+							TXT,
+					)
 					->render();
 
 				PHP,
@@ -256,6 +375,47 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 
 				PHP,
 		];
+	}
+
+	/**
+	 * The value of every heredoc in the snippet, evaluated in place.
+	 *
+	 * @return array<string>
+	 */
+	private static function heredocValues(string $code): array
+	{
+		$name = 'Tom'; // Referenced by the evaluated fixtures that interpolate.
+		$values = [];
+		$parts = [];
+		$depth = 0;
+
+		foreach (Tokens::fromCode($code) as $token)
+		{
+			if ($token->isGivenKind(\T_START_HEREDOC))
+			{
+				$depth++;
+			}
+
+			if (0 === $depth)
+			{
+				continue;
+			}
+
+			$parts[] = $token->getContent();
+
+			if (!$token->isGivenKind(\T_END_HEREDOC))
+			{
+				continue;
+			}
+
+			if (0 === --$depth)
+			{
+				$values[] = eval('return ' . implode('', $parts) . ';');
+				$parts = [];
+			}
+		}
+
+		return $values;
 	}
 
 	private static function fix(string $code): string

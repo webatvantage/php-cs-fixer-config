@@ -159,16 +159,35 @@ final class ChainedCallArgumentIndentationFixer extends AbstractFixer implements
 		}
 
 		$lineIndexes = [];
+		$heredocRanges = [];
+		$heredocStart = null;
+		$heredocDepth = 0;
 
 		for ($index = $openIndex + 1; $index < $closeIndex; $index++)
 		{
 			$token = $tokens[$index];
 
-			// Heredoc and nowdoc bodies carry their indentation outside of whitespace tokens, so
-			// shifting the lines around them would silently change the string's contents.
 			if ($token->isGivenKind(\T_START_HEREDOC))
 			{
-				return;
+				if (0 === $heredocDepth)
+				{
+					$heredocStart = $index;
+				}
+
+				$heredocDepth++;
+			}
+
+			// A heredoc body carries its indentation inside string tokens rather than whitespace
+			// ones, so none of the line handling below applies to it. It is re-indented as a whole
+			// once the lines around it have settled.
+			if ($heredocDepth > 0)
+			{
+				if ($token->isGivenKind(\T_END_HEREDOC) && 0 === --$heredocDepth)
+				{
+					$heredocRanges[] = [$heredocStart, $index];
+				}
+
+				continue;
 			}
 
 			if (!$token->isWhitespace())
@@ -211,6 +230,154 @@ final class ChainedCallArgumentIndentationFixer extends AbstractFixer implements
 
 			$this->setIndent($tokens, $index, $targetIndent . substr($indent, \strlen($currentIndent)));
 		}
+
+		foreach ($heredocRanges as list($startIndex, $endIndex))
+		{
+			$this->reindentHeredoc($tokens, $startIndex, $endIndex);
+		}
+	}
+
+	/**
+	 * Re-indent a heredoc or nowdoc to sit one level below the line it opens on.
+	 *
+	 * PHP strips the closing marker's indentation from every line of the body, so the marker and
+	 * the body have to move together or the string's value changes. The target is absolute rather
+	 * than a shift by however far the block moved: nothing upstream normalises heredoc contents,
+	 * so a relative shift would survive into the next run and accumulate.
+	 */
+	private function reindentHeredoc(Tokens $tokens, int $startIndex, int $endIndex): void
+	{
+		$current = $this->leadingWhitespace($tokens[$endIndex]->getContent());
+		$target = $this->openerIndent($tokens, $startIndex) . $this->whitespacesConfig->getIndent();
+
+		if ($current === $target)
+		{
+			return;
+		}
+
+		// Collect every rewrite first: a body line that does not carry the marker's indentation is
+		// hand-aligned, and the heredoc has to be left exactly as it was rather than half moved.
+		$replacements = [$endIndex => $target . substr($tokens[$endIndex]->getContent(), \strlen($current))];
+
+		for ($index = $startIndex; $index < $endIndex; $index++)
+		{
+			$token = $tokens[$index];
+			$content = $token->getContent();
+
+			// The opening token ends with the line break that starts the body, and holds no
+			// indentation itself. Only a body line starting with a token that cannot carry
+			// indentation, such as an interpolated variable, has to borrow it from here.
+			if ($token->isGivenKind(\T_START_HEREDOC))
+			{
+				if (!$this->carriesOwnIndent($tokens, $index + 1))
+				{
+					if ('' !== $current)
+					{
+						return;
+					}
+
+					$replacements[$index] = $content . $target;
+				}
+
+				continue;
+			}
+
+			if (!$token->isGivenKind(\T_ENCAPSED_AND_WHITESPACE))
+			{
+				continue;
+			}
+
+			$result = '';
+			$position = 0;
+			$length = \strlen($content);
+			$atLineStart = $tokens[$index - 1]->isGivenKind(\T_START_HEREDOC);
+
+			while ($position < $length)
+			{
+				$character = $content[$position];
+
+				// A blank line is allowed to carry no indentation at all, so leave it empty.
+				if ($atLineStart && "\n" !== $character)
+				{
+					if (0 !== strncmp(substr($content, $position), $current, \strlen($current)))
+					{
+						return;
+					}
+
+					$result .= $target;
+					$position += \strlen($current);
+					$atLineStart = false;
+
+					continue;
+				}
+
+				$result .= $character;
+				$atLineStart = "\n" === $character;
+				$position++;
+			}
+
+			// A line break at the very end of the token opens a line that continues in the next
+			// one, which again may be unable to carry indentation of its own.
+			if ($atLineStart && !$this->carriesOwnIndent($tokens, $index + 1))
+			{
+				if ('' !== $current)
+				{
+					return;
+				}
+
+				$result .= $target;
+			}
+
+			if ($result !== $content)
+			{
+				$replacements[$index] = $result;
+			}
+		}
+
+		foreach ($replacements as $index => $content)
+		{
+			$tokens[$index] = new Token([$tokens[$index]->getId(), $content]);
+		}
+	}
+
+	/**
+	 * Whether the token starting a heredoc body line holds that line's indentation itself. The
+	 * closing marker does, and so does any run of literal text; an interpolation does not.
+	 */
+	private function carriesOwnIndent(Tokens $tokens, int $index): bool
+	{
+		return $tokens[$index]->isGivenKind([\T_ENCAPSED_AND_WHITESPACE, \T_END_HEREDOC]);
+	}
+
+	/**
+	 * The indentation of the line a heredoc opens on, as it stands once the block's own lines
+	 * have been re-indented.
+	 */
+	private function openerIndent(Tokens $tokens, int $startIndex): string
+	{
+		for ($index = $startIndex - 1; $index >= 0; $index--)
+		{
+			if (!$tokens[$index]->isWhitespace())
+			{
+				continue;
+			}
+
+			$indent = $this->indentAfterLastNewLine($tokens[$index]->getContent());
+
+			if (null !== $indent)
+			{
+				return $indent;
+			}
+		}
+
+		return '';
+	}
+
+	private function leadingWhitespace(string $content): string
+	{
+		$trimmed = ltrim($content, " \t");
+
+		return substr($content, 0, \strlen($content) - \strlen($trimmed));
 	}
 
 	private function setIndent(Tokens $tokens, int $index, string $indent): void
