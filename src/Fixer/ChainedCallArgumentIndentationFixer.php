@@ -185,7 +185,9 @@ final class ChainedCallArgumentIndentationFixer extends AbstractFixer implements
 
 			// Every line of the block is nested inside the closing parenthesis' line and so carries
 			// its indentation as a prefix. Anything else is hand-aligned; leave the block alone.
-			if (0 !== strpos($indent, $currentIndent))
+			// strncmp rather than strpos: the parenthesis can sit at column 0, and an empty needle
+			// is a warning on PHP 7.4, where it only became legal in PHP 8.0.
+			if (0 !== strncmp($indent, $currentIndent, \strlen($currentIndent)))
 			{
 				return;
 			}
