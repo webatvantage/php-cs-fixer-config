@@ -31,21 +31,21 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 
 	public static function provideFixCases(): iterable
 	{
-		yield 'return statement' => [
+		yield 'call heading a chain' => [
 			<<<'PHP'
 				<?php
-				return new Report(
-						rows: 100,
-						verbose: true,
+				return $this->build(
+						100,
+						true,
 					)
 					->withFormat(Format::Csv);
 
 				PHP,
 			<<<'PHP'
 				<?php
-				return new Report(
-					rows: 100,
-					verbose: true,
+				return $this->build(
+					100,
+					true,
 				)
 					->withFormat(Format::Csv);
 
@@ -55,37 +55,18 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 		yield 'assignment' => [
 			<<<'PHP'
 				<?php
-				$report = new Report(
-						rows: 100,
+				$report = $this->build(
+						100,
 					)
 					->withFormat(Format::Csv);
 
 				PHP,
 			<<<'PHP'
 				<?php
-				$report = new Report(
-					rows: 100,
+				$report = $this->build(
+					100,
 				)
 				->withFormat(Format::Csv);
-
-				PHP,
-		];
-
-		yield 'nullsafe chain' => [
-			<<<'PHP'
-				<?php
-				$value = $this->maybe(
-						a: 1,
-					)
-					?->value();
-
-				PHP,
-			<<<'PHP'
-				<?php
-				$value = $this->maybe(
-					a: 1,
-				)
-					?->value();
 
 				PHP,
 		];
@@ -95,10 +76,10 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 				<?php
 				return outer(
 						inner(
-								a: 1,
+								1,
 							)
 							->mid(),
-						c: 3,
+						3,
 					)
 					->tail();
 
@@ -107,10 +88,10 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 				<?php
 				return outer(
 					inner(
-						a: 1,
+						1,
 					)
 					->mid(),
-					c: 3,
+					3,
 				)
 				->tail();
 
@@ -122,10 +103,10 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 				<?php
 				return $this
 					->where(
-						a: 1,
+						1,
 					)
 					->orderBy(
-						b: 2,
+						2,
 					)
 					->first();
 
@@ -134,10 +115,10 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 				<?php
 				return $this
 					->where(
-						a: 1,
+						1,
 					)
 					->orderBy(
-						b: 2,
+						2,
 					)
 					->first();
 
@@ -148,14 +129,14 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 			<<<'PHP'
 				<?php
 				return $this->call(
-					a: 1,
+					1,
 				)->go();
 
 				PHP,
 			<<<'PHP'
 				<?php
 				return $this->call(
-					a: 1,
+					1,
 				)->go();
 
 				PHP,
@@ -165,14 +146,14 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 			<<<'PHP'
 				<?php
 				return $this->call(
-					a: 1,
+					1,
 				);
 
 				PHP,
 			<<<'PHP'
 				<?php
 				return $this->call(
-					a: 1,
+					1,
 				);
 
 				PHP,
@@ -182,7 +163,7 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 			<<<'PHP'
 				<?php
 				return $this->build(
-					body: <<<'TXT'
+					<<<'TXT'
 						line one
 						TXT,
 				)
@@ -192,11 +173,86 @@ final class ChainedCallArgumentIndentationFixerTest extends TestCase
 			<<<'PHP'
 				<?php
 				return $this->build(
-					body: <<<'TXT'
+					<<<'TXT'
 						line one
 						TXT,
 				)
 					->render();
+
+				PHP,
+		];
+
+		// Named arguments and the nullsafe operator are PHP 8.0 syntax, and Tokens::fromCode()
+		// parses rather than merely lexes, so these cases are a fatal on 7.4 rather than a failure.
+		if (\PHP_VERSION_ID < 80000)
+		{
+			return;
+		}
+
+		yield 'named arguments' => [
+			<<<'PHP'
+				<?php
+				return $this->build(
+						rows: 100,
+						verbose: true,
+					)
+					->withFormat(Format::Csv);
+
+				PHP,
+			<<<'PHP'
+				<?php
+				return $this->build(
+					rows: 100,
+					verbose: true,
+				)
+					->withFormat(Format::Csv);
+
+				PHP,
+		];
+
+		yield 'nullsafe chain' => [
+			<<<'PHP'
+				<?php
+				$value = $this->maybe(
+						1,
+					)
+					?->value();
+
+				PHP,
+			<<<'PHP'
+				<?php
+				$value = $this->maybe(
+					1,
+				)
+					?->value();
+
+				PHP,
+		];
+
+		// Chaining straight off `new` without wrapping parentheses is PHP 8.4 syntax. It is the
+		// shape this fixer was written for, so it is worth covering where the parser allows it.
+		if (\PHP_VERSION_ID < 80400)
+		{
+			return;
+		}
+
+		yield 'new without parentheses' => [
+			<<<'PHP'
+				<?php
+				$report = new Report(
+						rows: 100,
+						verbose: true,
+					)
+					->withFormat(Format::Csv);
+
+				PHP,
+			<<<'PHP'
+				<?php
+				$report = new Report(
+					rows: 100,
+					verbose: true,
+				)
+					->withFormat(Format::Csv);
 
 				PHP,
 		];
